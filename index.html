@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BACOBAZIK</title>
+<style>
+  body {
+    font-family: Arial, sans-serif; 
+    max-width: 600px; 
+    margin: 0 auto; 
+    padding: 20px; 
+    background: #f9f9f9;
+  }
+  h1, h2 {
+    text-align: center;
+  }
+  .flag-note {
+    text-align: center; 
+    margin: 10px 0; 
+    font-size: 0.9em; 
+    color: #333;
+  }
+  label {
+    display: block;
+    margin-top: 20px;
+    font-weight: bold;
+  }
+  select {
+    width: 100%; 
+    padding: 10px; 
+    margin-top: 5px;
+  }
+  .output {
+    margin-top: 20px;
+    border-top: 1px solid #ccc; 
+    padding-top: 20px;
+  }
+  .output a {
+    word-wrap: break-word;
+    color: #0066cc;
+    text-decoration: none;
+  }
+  .output a:hover {
+    text-decoration: underline;
+  }
+  .resource-title {
+    font-weight: bold; 
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+  <h1>BACOBAZIK</h1>
+  <h2>Ecoutez vos fiches de révision en podcast !</h2>
+  <div class="flag-note">🇫🇷 Contenu issu du service Educsol de l'Education Nationale</div>
+
+  <label for="subjectSelect">Matière :</label>
+  <select id="subjectSelect"></select>
+
+  <label for="chapterSelect">Chapitre :</label>
+  <select id="chapterSelect"></select>
+
+  <div class="output">
+    <div class="resource-title">Ressources disponibles :</div>
+    <div><span class="resource-title">Fiche de révision (PDF) :</span> <a id="pdfLink" href="#" target="_blank"></a></div>
+    <div><span class="resource-title">Podcast (Audio) :</span> <a id="audioLink" href="#" target="_blank"></a></div>
+  </div>
+
+<script>
+(async function() {
+  // Use your correct TSV link here:
+  const TSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWrLucr1EvjM8fnBeXrIZAnY5byfNWjoozPrufRtJlEhDttE1BoGsu27s6AaanuV3ytQOIKFX2PINC/pub?output=tsv";
+
+  const subjectSelect = document.getElementById("subjectSelect");
+  const chapterSelect = document.getElementById("chapterSelect");
+  const pdfLink = document.getElementById("pdfLink");
+  const audioLink = document.getElementById("audioLink");
+
+  const response = await fetch(TSV_URL);
+  let text = await response.text();
+
+  // Remove possible BOM:
+  text = text.replace(/^\uFEFF/, '');
+
+  const lines = text.trim().split("\n");
+
+  // Split header line by tab:
+  const header = lines[0].split("\t").map(h => h.trim());
+
+  console.log("Parsed Headers:", header); // Debug to see headers
+
+  // Flexible column finder
+  function findColumnIndex(header, name) {
+    const target = name.toUpperCase().trim();
+    for (let i = 0; i < header.length; i++) {
+      if (header[i].toUpperCase().trim() === target) {
+        return i;
+      }
+    }
+    return -1; // not found
+  }
+
+  const subjectIdx = findColumnIndex(header, "SUBJECT");
+  const chapterIdx = findColumnIndex(header, "CHAPTER");
+  const pdfIdx = findColumnIndex(header, "REVISION SHEET");
+  const audioIdx = findColumnIndex(header, "PODCAST");
+
+  // If any index is -1, it means the header wasn't found
+  if (subjectIdx === -1 || chapterIdx === -1 || pdfIdx === -1 || audioIdx === -1) {
+    console.error("One or more headers not found. Check your sheet headers again.");
+    return;
+  }
+
+  const data = lines.slice(1).map(line => {
+    const parts = line.split("\t").map(p => p.trim());
+    return {
+      subject: parts[subjectIdx],
+      chapter: parts[chapterIdx],
+      revisionSheet: parts[pdfIdx],
+      podcast: parts[audioIdx]
+    };
+  });
+
+  const subjects = [...new Set(data.map(row => row.subject))];
+  subjectSelect.innerHTML = "<option value=''>--Sélectionnez--</option>";
+  subjects.forEach(subj => {
+    const opt = document.createElement("option");
+    opt.value = subj;
+    opt.textContent = subj;
+    subjectSelect.appendChild(opt);
+  });
+
+  subjectSelect.addEventListener("change", () => {
+    chapterSelect.innerHTML = "<option value=''>--Sélectionnez--</option>";
+    clearLinks();
+    const selectedSubject = subjectSelect.value;
+    if (selectedSubject) {
+      const filtered = data.filter(row => row.subject === selectedSubject);
+      const uniqueChapters = [...new Set(filtered.map(row => row.chapter))];
+      uniqueChapters.forEach(ch => {
+        const opt = document.createElement("option");
+        opt.value = ch;
+        opt.textContent = ch;
+        chapterSelect.appendChild(opt);
+      });
+    }
+  });
+
+  chapterSelect.addEventListener("change", () => {
+    clearLinks();
+    const selectedSubject = subjectSelect.value;
+    const selectedChapter = chapterSelect.value;
+    const entry = data.find(row => row.subject === selectedSubject && row.chapter === selectedChapter);
+    if (entry) {
+      pdfLink.textContent = entry.revisionSheet ? entry.revisionSheet : "Aucune Fiche de Révision disponible";
+      pdfLink.href = entry.revisionSheet ? entry.revisionSheet : "#";
+      audioLink.textContent = entry.podcast ? entry.podcast : "Aucun Podcast disponible";
+      audioLink.href = entry.podcast ? entry.podcast : "#";
+    }
+  });
+
+  function clearLinks() {
+    pdfLink.textContent = "";
+    pdfLink.href = "#";
+    audioLink.textContent = "";
+    audioLink.href = "#";
+  }
+})();
+</script>
+</body>
+</html>
